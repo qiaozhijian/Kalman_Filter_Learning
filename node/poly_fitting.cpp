@@ -9,39 +9,45 @@ using namespace std;
 double random_normal(double std);
 
 #define N_DIM 3
-#define M_DIM 1
+#define M_DIM 2
 
 int main(int argc, char **argv) {
 
-    double a = 2.0, b = 3.0, c = 4.0;
+    double a = 1.0, b = 2.0, c = 1.0;
 
 //    generate quadratic curve
-    const int N = 1000;
+    const int N = 10;
     double dt = 2;
-    double t = dt;
-    Eigen::Matrix<double, N, M_DIM> Z;
-    Eigen::Matrix<double, N, N_DIM> H;
+    Eigen::Matrix<double, N * M_DIM, 1> Z = Eigen::Matrix<double, N * M_DIM, 1>::Zero();
+    Eigen::Matrix<double, N * M_DIM, N_DIM> H = Eigen::Matrix<double, N * M_DIM, N_DIM>::Zero();
     double meas_noise = 0.001;
-    for (int i = 0; i < N; i++) {
-        t = i * dt;
-        Z(i, 0) = a * t * t + b * t + c + random_normal(meas_noise);
-        H.row(i) << t * t, t, 1;
+    for (int i = 0; i < N / M_DIM; i++) {
+        double t = i * dt * M_DIM;
+        Eigen::Matrix<double, M_DIM, N_DIM> H_i;
+        Eigen::Matrix<double, M_DIM, 1> Z_i;
+        for (int j = 0; j < M_DIM; j++) {
+            H_i.row(j) << pow(t, 2), t, 1;
+            Z_i(j) = a * t * t + b * t + c + random_normal(meas_noise);
+            t += dt;
+        }
+        H.block<M_DIM, N_DIM>(i * M_DIM, 0) = H_i;
+        Z.block<M_DIM, 1>(i * M_DIM, 0) = Z_i;
     }
 
 //    Kalman Filter
-    KalmanFilter<N_DIM, M_DIM> kf(false);
+    KalmanFilter<N_DIM, M_DIM> kf(true);
     Eigen::Matrix<double, N_DIM, 1> X0 = Eigen::Matrix<double, N_DIM, 1>::Identity();
     Eigen::Matrix<double, N_DIM, N_DIM> P0 = Eigen::Matrix<double, N_DIM, N_DIM>::Identity();
     kf.setInitState(X0, P0);
     Eigen::Matrix<double, N_DIM, N_DIM> R = Eigen::Matrix<double, N_DIM, N_DIM>::Identity() * 0.01;
     Eigen::Matrix<double, M_DIM, M_DIM> Q = Eigen::Matrix<double, M_DIM, M_DIM>::Identity() * meas_noise;
 
-    for (int i = 0; i < N; ++i) {
+    for (int i = 0; i < N / M_DIM; ++i) {
         Eigen::Matrix<double, N_DIM, N_DIM> A = Eigen::Matrix<double, N_DIM, N_DIM>::Identity();
         kf.predict(A, R);
 
-        Eigen::Matrix<double, M_DIM, N_DIM> H_ = H.row(i);
-        Eigen::Matrix<double, M_DIM, M_DIM> Z_ = Z.row(i);
+        Eigen::Matrix<double, M_DIM, N_DIM> H_ = H.block<M_DIM, N_DIM>(i * M_DIM, 0);
+        Eigen::Matrix<double, M_DIM, 1> Z_ = Z.block<M_DIM, 1>(i * M_DIM, 0);
         kf.update(H_, Q, Z_);
     }
     kf.print();
@@ -55,12 +61,23 @@ int main(int argc, char **argv) {
 
     // Least Square
     Eigen::Matrix<double, N_DIM, N_DIM> HTH_inv = (H.transpose() * H).inverse();
-    Eigen::Matrix<double, N_DIM, N> HTH_inv_HT = HTH_inv * H.transpose();
+    Eigen::Matrix<double, N_DIM, N * M_DIM> HTH_inv_HT = HTH_inv * H.transpose();
     Eigen::Matrix<double, N_DIM, 1> X_ls = HTH_inv_HT * Z;
     std::cout << "X_ls: " << X_ls.transpose() << std::endl;
     error = (X_ls - X_true).norm();
     std::cout << "Error: " << error << std::endl;
     std::cout << "Least Square done." << std::endl;
+
+    // Observability analysis
+    std::cout << "Observability analysis of Kalman Filter: " << std::endl;
+    Eigen::JacobiSVD<Eigen::MatrixXd> svd(H, Eigen::ComputeThinU | Eigen::ComputeThinV);
+    Eigen::MatrixXd U = svd.matrixU();
+    Eigen::MatrixXd V = svd.matrixV();
+    Eigen::MatrixXd S = svd.singularValues();
+    std::cout << "Singular values: " << S.transpose() << std::endl;
+    for (int i = 0; i < S.rows(); ++i) {
+        std::cout << "Observability of " << i << "-th state: " << S(i) / S(0) << std::endl;
+    }
 
     return 0;
 }
