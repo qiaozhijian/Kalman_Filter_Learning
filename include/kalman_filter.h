@@ -39,6 +39,7 @@ public:
         X_ = A * X_;
         P_ = A * P_ * A.transpose() + R;
         if (print_) {
+            // every time predict, P increases
             std::cout << "After predict, deterrminant of P = " << P_.determinant() << std::endl;
         }
     }
@@ -50,6 +51,7 @@ public:
         P_ = (Eigen::MatrixXd::Identity(N_DIM, N_DIM) - K * H) * P_;
         if (print_) {
             std::cout << "X = " << X_.transpose() << std::endl;
+            // every time update, P decreases
             std::cout << "After update, Deterrminant of P = " << P_.determinant() << std::endl;
         }
     }
