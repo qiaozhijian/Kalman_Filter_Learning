@@ -40,6 +40,7 @@ public:
         P_ = A * P_ * A.transpose() + R;
         if (print_) {
             // every time predict, P increases
+            std::cout << "After predict, P = \n" << P_ << std::endl;
             std::cout << "After predict, deterrminant of P = " << P_.determinant() << std::endl;
         }
     }
@@ -48,16 +49,19 @@ public:
         MatrixMd S = H * P_ * H.transpose() + Q;
         MatrixNMd K = P_ * H.transpose() * S.inverse();
         X_ = X_ + K * (Z - H * X_);
+        std::cout << "K = \n" << K << std::endl;
+        std::cout << "Z - H * X_ = \n" << Z - H * X_ << std::endl;
         P_ = (Eigen::MatrixXd::Identity(N_DIM, N_DIM) - K * H) * P_;
         if (print_) {
-            std::cout << "X = " << X_.transpose() << std::endl;
+            std::cout << "After update, X = " << X_.transpose() << std::endl;
             // every time update, P decreases
+            std::cout << "After update, P = \n" << P_ << std::endl;
             std::cout << "After update, Deterrminant of P = " << P_.determinant() << std::endl;
         }
     }
 
     void print() {
-        std::cout << "X_ = " << X_.transpose() << std::endl;
+        std::cout << "Kalman filter obtained X_ = " << X_.transpose() << std::endl;
         std::cout << "P_ = " << std::endl << P_ << std::endl;
         std::cout << "Deterrminant of P = " << P_.determinant() << std::endl;
     }
